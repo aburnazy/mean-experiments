@@ -70,4 +70,31 @@ router.route('/:quizId')
   	
 })
 
+
+router.route('/comment/:quizId')
+.put(function(req, res, next) {
+	console.log(req.body);
+	
+	Quiz.findById(req.params.quizId, function(err, quiz) {
+		if(err) {
+			console.error('Ooops could not get quizzes');
+			res.end('error');;	
+			return;
+		}
+
+		quiz.comments.push(req.body);
+
+        quiz.save(function (err, dish) {
+            console.log('Updated Comments!');
+            console.log(quiz);
+
+           	res.writeHead(200, {'Content-type': 'application/json'});
+			res.end(JSON.stringify(quiz));
+        });	
+	});
+
+  	
+})
+
+
 module.exports = router;
