@@ -2,68 +2,36 @@ var express = require('express');
 var path = require('path');
 var favicon = require('serve-favicon');
 var logger = require('morgan');
-var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
 
 var mongoose = require('mongoose');
 var assert = require('assert');
 
+// var cookieParser = require('cookie-parser');
+// var session = require('express-session');
+// var FileStore = require('session-file-store')(session);
+
+var passport = require('passport');
+var LocalStrategy = require('passport-local').Strategy;
+
+var config = require('./config');
+// var auth = require('./auth');
+
 var routes = require('./routes/index');
+var admin = require('./routes/admin');
 var users = require('./routes/users');
 var quizzes = require('./routes/quizzes');
 
 var operations = require('./operations');
 
-
-var MONGO_URL = "mongodb://localhost:27017/quizzes";
-mongoose.connect(MONGO_URL);
+mongoose.connect(config.mongoUrl);
 var db = mongoose.connection;
 
 db.on('error', console.error.bind(console, 'connection error:'));
 
 db.once('open', function() {
-  console.log('Connected to mongodb server at '+MONGO_URL);
+  console.log('Connected to mongodb server at '+config.mongoUrl);
 });
-
-// var MongoClient = require('mongodb').MongoClient, assert = require('assert');
-
-
-// MongoClient.connect(MONGO_URL, function(err, db) {
-//   assert.equal(err, null);
-//   console.log("Connected to MongoDB server");
-
-//   var collection = 'questions';
-//   var document = {name: "Ex-machina"};
-//   var update = {name: "Vikings", description: "A movie about how sexy and awesome Vikings were"};
-
-//   operations.updateDocument(db, document, update, collection, function(result) {
-//       console.log("Removed this: ");
-//       console.log(result);
-
-//     operations.findDocuments(db, collection, function(result) {
-//       console.log("Heres what he have now: ");
-//       console.log(result);
-
-//       db.close();
-//     });    
-//   });
-
-
-  // var collection = db.collection('questions');
-
-  // collection.insertOne({name: "Ex-machina", description: "A movie about a robot chick"}, function(err, result) {
-  //   assert.equal(err, null);
-  //   console.log("After Insert:");
-  //   console.log(result.ops);
-
-  //   collection.find({}).toArray(function(err, docs) {
-  //     assert.equal(err, null);
-  //     console.log("Found:");
-  //     console.log(docs);      
-  //   });
-
-  // });
-// });
 
 var app = express();
 
@@ -74,12 +42,32 @@ app.set('view engine', 'jade');
 // uncomment after placing your favicon in /public
 //app.use(favicon(path.join(__dirname, 'public', 'favicon.ico')));
 app.use(logger('dev'));
+
+// app.use(cookieParser(config.secretKey));
+// app.use(session({
+//   name: 'session-id',
+//   secret: config.secretKey,
+//   saveUninitialized: true,
+//   resave: true,
+//   store: new FileStore()
+// }));
+
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
-app.use(cookieParser());
+
+// app.use(auth);
+
+// passport config
+var User = require('./models/user');
+app.use(passport.initialize());
+passport.use(new LocalStrategy(User.authenticate()));
+passport.serializeUser(User.serializeUser());
+passport.deserializeUser(User.deserializeUser());
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/', routes);
+app.use('/admin', admin);
 app.use('/users', users);
 app.use('/quizzes', quizzes);
 
@@ -94,24 +82,23 @@ app.use(function(req, res, next) {
 
 // development error handler
 // will print stacktrace
-if (app.get('env') === 'development') {
-  app.use(function(err, req, res, next) {
+
+app.use(function(err, req, res, next) {
+  if(err.status == 401) {
+    res.writeHead(401, {
+      'WWW-Authenticate': 'Basic',
+      'Content-Type': 'text/plain'
+    });
+
+    res.end("<b>"+err.status+" "+err.message+"</b>");
+  } else {
     res.status(err.status || 500);
+
     res.render('error', {
       message: err.message,
-      error: err
-    });
-  });
-}
-
-// production error handler
-// no stacktraces leaked to user
-app.use(function(err, req, res, next) {
-  res.status(err.status || 500);
-  res.render('error', {
-    message: err.message,
-    error: {}
-  });
+      error: app.get('env') === 'development' ? err : {}
+    });      
+  }
 });
 
 

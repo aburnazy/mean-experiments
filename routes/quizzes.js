@@ -1,11 +1,12 @@
 var express = require('express');
 var Quiz = require('../models/quizzes');
+var Verify = require('./verify');
 
 var router = express.Router();
 
 /* GET users listing. */
 router.route('/')
-.post(function(req, res, next) {
+.post(Verify.verifyOrdinaryUser, function(req, res, next) {
 	console.log(req.body);
 
 	var newQuiz = Quiz(req.body);
@@ -32,7 +33,7 @@ router.route('/')
 		res.end('ok');
 	});  	
 })
-.get(function(req, res, next) {
+.get(Verify.verifyOrdinaryUser, function(req, res, next) {
 	console.log('Retrieving all quizzes');
 
 	Quiz.find({}, function(err, quizzes) {
@@ -48,7 +49,7 @@ router.route('/')
 });
 
 router.route('/:quizId')
-.put(function(req, res, next) {
+.put(Verify.verifyOrdinaryUser, function(req, res, next) {
 	console.log(req.body);
 
 	Quiz.findByIdAndUpdate(req.params.quizId, {
@@ -72,7 +73,7 @@ router.route('/:quizId')
 
 
 router.route('/comment/:quizId')
-.put(function(req, res, next) {
+.put(Verify.verifyOrdinaryUser, function(req, res, next) {
 	console.log(req.body);
 	
 	Quiz.findById(req.params.quizId, function(err, quiz) {
