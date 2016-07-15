@@ -37,16 +37,15 @@ router.route('/')
 .get(Verify.verifyOrdinaryUser, function(req, res, next) {
 	console.log('Retrieving all quizzes');
 
-	Quiz.find({}, function(err, quizzes) {
-		if(err) {
-			console.error('Ooops could not get quizzes');
-			res.end('error');;	
-			return;
-		}
+	Quiz.find({})
+		.populate('comments.postedBy')
+		.exec( function(err, quizzes) {
+				if(err) {
+					throw err;
+				}
 
-		res.writeHead(200, {'Content-type': 'application/json'});
-		res.end(JSON.stringify(quizzes));
-	});
+				res.json(quizzes);
+			});
 });
 
 router.route('/:quizId')
@@ -73,8 +72,8 @@ router.route('/:quizId')
 })
 
 
-router.route('/comment/:quizId')
-.put(Verify.verifyAdminUser, function(req, res, next) {
+router.route('/:quizId/comment')
+.post(Verify.verifyOrdinaryUser, function(req, res, next) {
 	console.log(req.body);
 	
 	Quiz.findById(req.params.quizId, function(err, quiz) {
@@ -83,8 +82,10 @@ router.route('/comment/:quizId')
 			res.end('error');;	
 			return;
 		}
+		var comment = req.body;
+		comment.postedBy = req.decoded._doc._id;
 
-		quiz.comments.push(req.body);
+		quiz.comments.push(comment);
 
         quiz.save(function (err, dish) {
             console.log('Updated Comments!');
@@ -96,7 +97,60 @@ router.route('/comment/:quizId')
 	});
 
   	
+});
+
+router.route('/:quizId/comment/:commentId')
+.all(Verify.verifyOrdinaryUser)
+
+.put(function(req, res, next) {
+	Quiz.findById(req.params.quizId, function(err, quiz) {
+		if(err) throw err;
+
+		if(quiz.comments.id(req.params.commentId).postedBy != req.decoded._doc._id) {
+			var err = new Error("You are not allowed to perform this operation!");
+			err.status = 403;
+
+			return next(err);
+		}
+
+		quiz.comments.id(req.params.commentId).remove();
+
+		req.body.postedBy = req.decoded._doc._id;
+
+		quiz.comments.push( req.body );		
+
+		quiz.save( function(err, quiz) {
+			if(err) throw err;
+			console.log("Updated Comments!");
+			console.log(quiz);
+
+			res.json(quiz);
+		} );
+	});
 })
+
+.delete(function(req, res, next) {
+	Quiz.findById(req.params.quizId, function(err, quiz) {
+
+		if(quiz.comments.id(req.params.commentId).postedBy != req.decoded._doc._id) {
+			var err = new Error("You are not allowed to perform this operation!");
+			err.status = 403;
+
+			return next(err);
+		}
+
+		quiz.comments.id(req.params.commentId).remove();
+
+		quiz.save(function(err, resp) {
+			if(err) throw err;
+
+			res.json(resp);
+		});
+	});
+})
+
+;
+
 
 
 module.exports = router;
